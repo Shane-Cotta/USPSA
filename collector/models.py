@@ -28,6 +28,14 @@ class ClubSource(models.Model):
     def __str__(self):
         return self.name
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        domains = [d.strip() for d in self.allowed_domains.split(",") if d.strip()]
+        if not domains:
+            raise ValidationError("allowed_domains must include at least one domain")
+        self.allowed_domains = ",".join(domains)
+
 
 class ClubManagerAssignment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

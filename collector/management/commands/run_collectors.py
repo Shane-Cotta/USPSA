@@ -4,9 +4,17 @@ import time
 from datetime import timedelta
 from urllib.parse import urlparse
 
+import logging
+
 import requests
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 from django.utils import timezone
+
+SECONDS_PER_HOUR = 3600
+MAX_DELAY_SECONDS = 60
+
+logger = logging.getLogger(__name__)
 
 from classification.models import ClassifierAttempt, ClassifierStage, Division, ShooterProfile
 from classification.services import on_attempt_created
@@ -75,7 +83,8 @@ class Command(BaseCommand):
                 run.errors += 1
                 continue
             self._parse_and_store(run, match, response)
-            time.sleep(max(1, int(3600 / match.club_source.max_requests_per_hour)))
+            delay_seconds = self._calculate_delay_seconds(match.club_source.max_requests_per_hour)
+            time.sleep(delay_seconds)
 
     def _domain_allowed(self, match: MatchSource) -> bool:
         allowed = match.club_source.allowed_domains.split(",")
@@ -94,8 +103,16 @@ class Command(BaseCommand):
             headers["If-None-Match"] = match.etag
         if match.last_modified:
             headers["If-Modified-Since"] = match.last_modified
+        verify_ssl = getattr(settings, "COLLECTOR_VERIFY_SSL", True)
+        if not verify_ssl:
+            logger.warning("Collector SSL verification disabled; intended for development use only.")
         try:
-            response = requests.get(match.practiscore_match_url, headers=headers, timeout=10)
+            response = requests.get(
+                match.practiscore_match_url,
+                headers=headers,
+                timeout=10,
+                verify=verify_ssl,
+            )
         except requests.RequestException as exc:
             match.last_status = "FAILED"
             match.last_error = str(exc)
@@ -106,6 +123,15 @@ class Command(BaseCommand):
         match.last_modified = response.headers.get("Last-Modified", match.last_modified)
         match.save(update_fields=["last_fetched_at", "etag", "last_modified"])
         return response
+
+    @staticmethod
+    def _calculate_delay_seconds(max_requests_per_hour: int) -> int:
+        """
+        Compute a polite delay between requests based on per-hour budget,
+        capping at 60s to avoid excessively long sleeps.
+        """
+        per_hour = max(1, max_requests_per_hour)
+        return min(MAX_DELAY_SECONDS, max(1, int(SECONDS_PER_HOUR / per_hour)))
 
     def _parser_for(self, match: MatchSource):
         mode = match.club_source.parsing_mode
@@ -118,7 +144,7 @@ class Command(BaseCommand):
     def _parse_and_store(self, run: CollectorRun, match: MatchSource, response):
         parser = self._parser_for(match)
         scores = parser.parse(response.text)
-        if scores is None:
+        if not scores:
             match.last_status = "PARSE_ERROR"
             match.last_error = "No scores parsed"
             match.save(update_fields=["last_status", "last_error"])

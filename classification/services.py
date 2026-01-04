@@ -46,10 +46,10 @@ def recompute_daily(profile: ShooterProfile, division: Division, stage, match_da
 
 
 def recompute_mro(profile: ShooterProfile, division: Division, stage):
-    daily_scores = DailyAggregateScore.objects.filter(
-        profile=profile, division=division, stage=stage
-    ).order_by("-match_date")
-    most_recent_date = daily_scores.first().match_date if daily_scores else None
+    daily_scores = list(
+        DailyAggregateScore.objects.filter(profile=profile, division=division, stage=stage).order_by("-match_date")
+    )
+    most_recent_date = daily_scores[0].match_date if daily_scores else None
     for ds in daily_scores:
         should_flag = most_recent_date and ds.match_date == most_recent_date
         if ds.is_mro != should_flag:

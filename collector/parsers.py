@@ -38,7 +38,7 @@ class HTMLV1Parser(BaseParser):
 class HTMLV2Parser(BaseParser):
     name = "HTML_V2"
     ROW_RE = re.compile(
-        r'classifier:(?P<classifier>\\S+)\\s+division:(?P<division>\\S+)\\s+hf:(?P<hitfactor>\\S+)\\s+date:(?P<date>\\S+)\\s+name:(?P<competitor>[^\\n]+)'
+        r"classifier:(?P<classifier>\S+)\s+division:(?P<division>\S+)\s+hf:(?P<hitfactor>\S+)\s+date:(?P<date>\S+)\s+name:(?P<competitor>[^\n]+)"
     )
 
     def parse(self, html: str) -> List[dict]:
@@ -63,10 +63,12 @@ class AutoParser(BaseParser):
 
     def __init__(self):
         self.parsers = [HTMLV1Parser(), HTMLV2Parser()]
+        self.last_parser_used = None
 
     def parse(self, html: str) -> List[dict]:
         for parser in self.parsers:
             results = parser.parse(html)
             if results:
+                self.last_parser_used = parser.name
                 return results
         return []

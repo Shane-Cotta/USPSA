@@ -71,19 +71,30 @@ class CSVImportView(LoginRequiredMixin, FormView):
     def form_valid(self, form):
         profile = self.request.user.profile
         created = 0
+        available_slugs = list(Division.objects.values_list("slug", flat=True))
         for row in form.parse_rows():
             try:
                 division = Division.objects.get(slug=row["division"])
+            except Division.DoesNotExist:
+                messages.error(
+                    self.request,
+                    f"Unknown division slug '{row.get('division')}'. Available: {', '.join(available_slugs)}.",
+                )
+                continue
+            try:
                 match_date = datetime.strptime(row["match_date"], "%Y-%m-%d").date()
                 stage_code = row["classifier_code"]
                 hit_factor = row["hit_factor"]
-            except Exception:
-                messages.error(self.request, f"Invalid row: {row}")
+            except (KeyError, ValueError):
+                messages.error(
+                    self.request,
+                    "Invalid row format. Expect columns: match_date (YYYY-MM-DD), division, classifier_code, hit_factor.",
+                )
                 continue
             try:
                 stage = ClassifierStage.objects.get(code=stage_code)
-            except Exception:
-                messages.error(self.request, f"Unknown classifier {stage_code}")
+            except ClassifierStage.DoesNotExist:
+                messages.error(self.request, f"Unknown classifier code '{stage_code}'. Ensure it matches a stage like 19-01.")
                 continue
             if ClassifierAttempt.objects.filter(
                 profile=profile, division=division, stage=stage, match_date=match_date, hit_factor=hit_factor

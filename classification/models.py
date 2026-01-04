@@ -6,7 +6,7 @@ from typing import Optional
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import models
 from django.utils import timezone
 
 from . import classification_engine as engine
@@ -101,6 +101,8 @@ class ClassifierAttempt(models.Model):
         self.capped_percent = engine.cap_percent(raw)
 
     def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError("ClassifierAttempt is immutable")
         self.full_clean()
         super().save(*args, **kwargs)
 
