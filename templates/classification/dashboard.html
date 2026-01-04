@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard</h2>
+<section>
+  <h3>Division summaries</h3>
+  <table>
+    <tr><th>Division</th><th>Current %</th><th>Class</th><th>Highest</th></tr>
+    {% for summary in summaries %}
+      <tr>
+        <td>{{ summary.division.name }}</td>
+        <td>{{ summary.current_percent }}</td>
+        <td>{{ summary.implied_class }}</td>
+        <td>{{ summary.highest_badge }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4">No data yet</td></tr>
+    {% endfor %}
+  </table>
+</section>
+<section>
+  <h3>Recent attempts</h3>
+  <table>
+    <tr><th>Date</th><th>Division</th><th>Stage</th><th>Hit Factor</th><th>%</th></tr>
+    {% for attempt in recent_attempts %}
+      <tr>
+        <td>{{ attempt.match_date }}</td>
+        <td>{{ attempt.division.slug }}</td>
+        <td>{{ attempt.stage.code }}</td>
+        <td>{{ attempt.hit_factor }}</td>
+        <td>{{ attempt.capped_percent }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5">None yet</td></tr>
+    {% endfor %}
+  </table>
+  <p>
+    <a href="{% url 'attempt-create' %}">Enter attempt</a> |
+    <a href="{% url 'csv-import' %}">Import CSV</a> |
+    <a href="{% url 'attempt-history' %}">History</a>
+  </p>
+</section>
+{% endblock %}
